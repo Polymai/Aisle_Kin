@@ -13,6 +13,22 @@ for select
 to authenticated
 using (auth.uid() = user_id);
 
+drop policy if exists "profiles_select_household_members" on app612_aislekin_profiles;
+create policy "profiles_select_household_members"
+on app612_aislekin_profiles
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from app612_aislekin_household_members viewer
+    join app612_aislekin_household_members member
+      on member.household_id = viewer.household_id
+    where viewer.user_id = auth.uid()
+      and member.user_id = app612_aislekin_profiles.user_id
+  )
+);
+
 drop policy if exists "profiles_insert_own" on app612_aislekin_profiles;
 create policy "profiles_insert_own"
 on app612_aislekin_profiles

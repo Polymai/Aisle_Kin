@@ -108,12 +108,28 @@ export async function loadHouseholdSettings(householdId) {
 
   const { data: members, error: membersError } = await supabase
     .from(MEMBERS)
-    .select('id, user_id, role, joined_at, profile:app612_aislekin_profiles(display_name, email, avatar_path)')
+    .select('id, user_id, role, joined_at')
     .eq('household_id', householdId)
     .order('joined_at', { ascending: true });
 
   if (membersError) {
     throw membersError;
+  }
+
+  const userIds = [...new Set((members || []).map((member) => member.user_id).filter(Boolean))];
+  let profileMap = new Map();
+
+  if (userIds.length) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from(PROFILES)
+      .select('user_id, display_name, email, avatar_path')
+      .in('user_id', userIds);
+
+    if (profilesError) {
+      throw profilesError;
+    }
+
+    profileMap = new Map((profiles || []).map((profile) => [profile.user_id, profile]));
   }
 
   const { data: invites, error: invitesError } = await supabase
@@ -130,7 +146,10 @@ export async function loadHouseholdSettings(householdId) {
 
   return {
     household,
-    members: members || [],
+    members: (members || []).map((member) => ({
+      ...member,
+      profile: profileMap.get(member.user_id) || null
+    })),
     invites: invites || []
   };
 }
